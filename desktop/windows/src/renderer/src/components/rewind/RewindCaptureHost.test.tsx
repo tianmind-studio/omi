@@ -33,10 +33,14 @@ function fakeStream(track: FakeTrack): MediaStream {
 let tracks: FakeTrack[] = []
 let getUserMedia: ReturnType<typeof vi.fn>
 let saveFrame: ReturnType<typeof vi.fn>
+let pushSettings:
+  | ((settings: { captureEnabled: boolean; intervalMs: number; highResCapture: boolean }) => void)
+  | null
 
 beforeEach(() => {
   vi.useFakeTimers()
   tracks = []
+  pushSettings = null
   saveFrame = vi.fn(async () => undefined)
   getUserMedia = vi.fn(async () => {
     const t = new FakeTrack()
@@ -46,7 +50,16 @@ beforeEach(() => {
   ;(navigator as unknown as { mediaDevices: unknown }).mediaDevices = { getUserMedia }
   ;(window as unknown as { omi: unknown }).omi = {
     rewindGetSettings: async () => ({ captureEnabled: true, intervalMs: INTERVAL_MS }),
-    onRewindSettings: () => () => undefined,
+    onRewindSettings: (
+      listener: (settings: {
+        captureEnabled: boolean
+        intervalMs: number
+        highResCapture: boolean
+      }) => void
+    ) => {
+      pushSettings = listener
+      return () => undefined
+    },
     rewindGetCaptureDirective: async () => ({ paused: false, intervalMs: INTERVAL_MS }),
     onRewindCaptureDirective: () => () => undefined,
     rewindPrimarySourceId: async () => 'screen:0:0',
@@ -92,6 +105,54 @@ async function tick(ms: number): Promise<void> {
 }
 
 describe('RewindCaptureHost — dead capture track', () => {
+  it('restarts capture with the high-resolution profile when the setting changes', async () => {
+    render(<RewindCaptureHost />)
+    await settle()
+
+    expect(getUserMedia).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        video: {
+          mandatory: expect.objectContaining({
+            maxWidth: 1280,
+            maxHeight: 720,
+            maxFrameRate: 1
+          })
+        }
+      })
+    )
+
+    await act(async () => {
+      pushSettings?.({
+        captureEnabled: true,
+        intervalMs: INTERVAL_MS,
+        highResCapture: true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(tracks[0].readyState).toBe('ended')
+    expect(getUserMedia).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        video: {
+          mandatory: expect.objectContaining({
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 1
+          })
+        }
+      })
+    )
+
+    await tick(INTERVAL_MS)
+    expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      'image/jpeg',
+      0.85
+    )
+  })
+
   it('stops saving frames and reopens the stream when the capture track dies', async () => {
     render(<RewindCaptureHost />)
     await settle()

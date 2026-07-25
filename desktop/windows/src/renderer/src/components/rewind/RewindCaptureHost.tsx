@@ -98,8 +98,7 @@ export function RewindCaptureHost(): React.JSX.Element {
         const v = videoRef.current
         if (v && isLive() && v.videoWidth && v.videoHeight && !savingRef.current) {
           const { width: w, height: h } = sampledCanvasSize(v.videoWidth, v.videoHeight, profile)
-          const canvas =
-            canvasRef.current ?? (canvasRef.current = document.createElement('canvas'))
+          const canvas = canvasRef.current ?? (canvasRef.current = document.createElement('canvas'))
           if (canvas.width !== w) canvas.width = w
           if (canvas.height !== h) canvas.height = h
           const ctx = canvas.getContext('2d')
