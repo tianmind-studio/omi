@@ -37,4 +37,21 @@ describe('export file I/O (real disk)', () => {
     expect(text).toContain('- Prefers TypeScript')
     expect(text).toContain('· 2 memories_')
   })
+
+  it('writes CJK and emoji content without BOM or corruption', async () => {
+    const i18nMemories = [
+      { content: '日本語のメモリー 🎌', category: '言語' },
+      { content: '中文记忆 🐉', category: '语言' }
+    ]
+    const target = join(work, 'i18n-memories.md')
+    await fs.mkdir(work, { recursive: true })
+    await exportToFile(target, i18nMemories)
+    const raw = await fs.readFile(target)
+    expect(raw[0]).not.toBe(0xef)
+    const text = raw.toString('utf8')
+    expect(text).toContain('- 日本語のメモリー 🎌')
+    expect(text).toContain('- 中文记忆 🐉')
+    expect(text).toContain('## 言語')
+    expect(text).toContain('## 语言')
+  })
 })
