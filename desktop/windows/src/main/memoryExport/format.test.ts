@@ -41,4 +41,23 @@ _Exported 2026-06-03 · 3 memories_
     const md = formatMemoriesMarkdown([{ content: 'line one\n  line two' }], at)
     expect(md).toContain('- line one line two')
   })
+
+  it('preserves CJK and emoji in content and categories', () => {
+    const md = formatMemoriesMarkdown(
+      [
+        { content: '喜欢喝咖啡 ☕', category: '个人' },
+        { content: '日本語を勉強中 📚', category: '学習' }
+      ],
+      at
+    )
+    expect(md).toContain('## 个人')
+    expect(md).toContain('- 喜欢喝咖啡 ☕')
+    expect(md).toContain('## 学習')
+    expect(md).toContain('- 日本語を勉強中 📚')
+  })
+
+  it('handles astral-plane characters (4-byte UTF-8)', () => {
+    const md = formatMemoriesMarkdown([{ content: '𝄞 music notation 𝕳𝖊𝖑𝖑𝖔' }], at)
+    expect(md).toContain('- 𝄞 music notation 𝕳𝖊𝖑𝖑𝖔')
+  })
 })
