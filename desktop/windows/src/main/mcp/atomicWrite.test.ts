@@ -32,8 +32,23 @@ describe('atomicWriteFileSync', () => {
     const p = join(dir, 'does', 'not', 'exist', 'd.txt')
     expect(() => atomicWriteFileSync(p, 'x')).toThrow()
     expect(existsSync(p)).toBe(false)
-    // No stray temp left in the (nonexistent) target dir either.
     const temps = readdirSync(dir).filter((f) => f.includes('.omi-tmp-'))
     expect(temps).toEqual([])
+  })
+
+  it('round-trips multi-byte UTF-8 (CJK, emoji, accented) without BOM or corruption', () => {
+    const content = '{"greeting":"你好世界","emoji":"🎉🚀","accents":"café naïve"}'
+    const p = join(dir, 'unicode.json')
+    atomicWriteFileSync(p, content)
+    const raw = readFileSync(p)
+    expect(raw[0]).not.toBe(0xef)
+    expect(readFileSync(p, 'utf8')).toBe(content)
+  })
+
+  it('preserves astral-plane characters (surrogate pairs in UTF-16, 4-byte in UTF-8)', () => {
+    const content = '𝄞 𝕳𝖊𝖑𝖑𝖔 𝟙𝟚𝟛'
+    const p = join(dir, 'astral.txt')
+    atomicWriteFileSync(p, content)
+    expect(readFileSync(p, 'utf8')).toBe(content)
   })
 })
