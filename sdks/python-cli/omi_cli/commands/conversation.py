@@ -122,7 +122,7 @@ def get_conversation(
 @app.command("create", help="Create a conversation from raw text.")
 def create_conversation(
     typer_ctx: typer.Context,
-    text: Optional[str] = typer.Option(None, "--text", help="Text body. Use '-' to read from stdin."),
+    text: Optional[str] = typer.Option(None, "--text", help="Text body. Use '-' to read UTF-8 from stdin."),
     text_source: ConversationTextSource = typer.Option(
         ConversationTextSource.other_text,
         "--text-source",
@@ -145,7 +145,18 @@ def create_conversation(
                 message="No --text provided",
                 detail="Pass --text 'your text' or pipe content via stdin and use --text -.",
             )
-        text = sys.stdin.read()
+        # Read raw bytes and decode as UTF-8. On Windows, sys.stdin.read() uses
+        # the process's locale encoding (often cp1252), which mangles UTF-8 input
+        # from pipes. Reading from stdin.buffer + explicit UTF-8 decode ensures
+        # non-ASCII text (e.g. "café") arrives intact regardless of the host locale.
+        # Undecodable bytes raise UnicodeDecodeError, surfaced as a UsageError.
+        try:
+            text = sys.stdin.buffer.read().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise UsageError(
+                message="Piped input is not valid UTF-8",
+                detail=f"Stdin must be UTF-8 encoded. Decode error: {exc}",
+            )
 
     body: dict[str, object] = {
         "text": text,
